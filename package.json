@@ -1,0 +1,6 @@
+{
+  "name": "purescript-amqplib",
+  "dependencies": {
+    "amqplib": "^0.5.1"
+  }
+}
