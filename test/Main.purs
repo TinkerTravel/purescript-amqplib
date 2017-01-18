@@ -21,6 +21,6 @@ main' =
     AMQP.withChannel conn \chan -> do
       let queue = AMQP.Queue "qu'est-ce que c'est"
       let message = ByteString.fromString "foobar" UTF8
-      AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions
+      AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
       AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
       pure unit
