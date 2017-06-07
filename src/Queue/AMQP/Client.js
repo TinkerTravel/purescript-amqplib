@@ -95,108 +95,83 @@ exports.assertQueue = function (chan) {
   };
 };
 
-exports.assertExchange = function (chan) {
-  return function (exchange) {
-    return function (exchangeType) {
-      return function (psOptions) {
-        var jsOptions = psOptions; // ?
-        return function (onSuccess, onError) {
-          chan.assertExchange(exchange, exchangeType, jsOptions, function (err, ok) {
-            if (err != null) {
-              onError(err);
-              return;
-            }
-            onSuccess(ok);
-          });
-        };
-      };
-    };
-  };
-};
-
-exports.sendToQueue = function (chan) {
-  return function (queue) {
-    return function (content) {
-      return function (psOptions) {
-        var jsOptions = {};
-        if (psOptions.expiration instanceof Data_Maybe.Just) {
-          jsOptions.expiration = psOptions.expiration.value0;
-        }
-        return function (onSuccess, onError) {
-          var sent = chan.sendToQueue(queue, content, jsOptions);
-          onSuccess(sent);
-        };
-      };
-    };
-  };
-};
-
-exports.publish = function (chan) {
-  return function (exchange) {
-    return function (routeKey) {
-      return function (content) {
-        return function (psOptions) {
-          var keys = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
-          var jsOptions = extractVars(psOptions, keys);
-
-          return function (onSuccess, onError) {
-            var sent = chan.publish(exchange, routeKey, content, jsOptions);
-            onSuccess(sent);
-          };
-        };
-      };
-    };
-  };
-};
-
-exports.bindQueue = function (chan) {
-  return function (queue) {
-    return function (exchange) {
-      return function (pattern) {
-        return function (args) {
-          return function (onSuccess, onError) {
-            chan.bindQueue(queue, exchange, pattern, args, function (err, ok) {
-              if (err) {
-                onError(err)
-              } else {
-                onSuccess(ok);
-              }
-            });
-          };
-        };
-      };
-    };
-  };
-};
-
-exports.consume = function (chan) {
-  return function (queue) {
-    return function (cb) {
-      return function (psOptions) {
-        var jsOptions = {};
-
-        if (psOptions instanceof Data_Maybe.Just) {
-          var keys = ["consumerTag", "noLocal", "noAck", "exclusive", "priority", "arguments"];
-          jsOptions = extractVars(psOptions.value0, keys);
-        }
-
-        return function (onSuccess, onError) {
-          chan.consume(queue, function (msg) {
-            console.log("RECEIVED MSG ", msg);
-            if (msg) {
-              cb(new Data_Maybe.Just(msg));
-            } else {
-              cb(new Data_Maybe.Nothing());
-            }
-          }, jsOptions, function (err, ok) {
-            if (err) {
-              onError(err);
-            } else {
-              onSuccess(ok);
-            }
-          })
-        }
+exports.assertExchangeImpl = function (chan, exchange, exchangeType, psOptions) {
+  var jsOptions = psOptions; // ?
+  return function (onSuccess, onError) {
+    chan.assertExchange(exchange, exchangeType, jsOptions, function (err, ok) {
+      if (err != null) {
+        onError(err);
+        return;
       }
-    }
+      onSuccess(ok);
+    });
+  };
+};
+
+exports.sendToQueueImpl = function (chan, queue, content, psOptions) {
+  var jsOptions = {};
+  if (psOptions.expiration instanceof Data_Maybe.Just) {
+    jsOptions.expiration = psOptions.expiration.value0;
   }
+  return function (onSuccess, onError) {
+    var sent = chan.sendToQueue(queue, content, jsOptions);
+    onSuccess(sent);
+  };
+};
+
+var publishOptionsKeys = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
+
+exports.publishImpl = function (chan, exchange, routeKey, content, psOptions) {
+  var jsOptions = extractVars(psOptions, publishOptionsKeys);
+
+  return function (onSuccess, onError) {
+    var sent = chan.publish(exchange, routeKey, content, jsOptions);
+    onSuccess(sent);
+  };
+};
+
+exports.bindQueueImpl = function (chan, queue, exchange, pattern, args) {
+  return function (onSuccess, onError) {
+    chan.bindQueue(queue, exchange, pattern, args, function (err, ok) {
+      if (err) {
+        onError(err)
+      } else {
+        onSuccess(ok);
+      }
+    });
+  };
+};
+
+var consumeOptionsKeys = ["consumerTag", "noLocal", "noAck", "exclusive", "priority", "arguments"];
+
+exports.consumeImpl = function (chan, queue, cb, psOptions) {
+  var jsOptions = {};
+
+  if (psOptions instanceof Data_Maybe.Just) {
+    jsOptions = extractVars(psOptions.value0, consumeOptionsKeys);
+  }
+
+  return function (onSuccess, onError) {
+    chan.consume(queue, function (msg) {
+      if (msg) {
+        cb(new Data_Maybe.Just(msg))();
+      } else {
+        cb(new Data_Maybe.Nothing.value)();
+      }
+    }, jsOptions, function (err, ok) {
+      if (err) {
+        onError(err);
+      } else {
+        onSuccess(ok);
+      }
+    })
+  }
+}
+
+
+exports.ackImpl = function (chan, message) {
+  return function (onSuccess, onError) {
+    chan.ack(message);
+    onSuccess();
+  };
 }

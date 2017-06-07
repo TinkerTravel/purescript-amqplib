@@ -4,17 +4,19 @@ module Test.Main
 
 import Prelude
 
-import Control.Monad.Aff (Aff, attempt, delay)
-import Control.Monad.Aff.Console (CONSOLE, log)
+import Control.Monad.Aff (Aff, delay, runAff)
+import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, makeVar', modifyVar, peekVar)
+import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff)
-import Data.ByteString (ByteString)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Error.Class (throwError)
 import Data.ByteString as ByteString
 import Data.Foreign (toForeign)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
-import Debug.Trace (traceA, traceAnyA)
+import Debug.Trace (traceAnyA)
 import Node.Encoding (Encoding(UTF8))
-import Queue.AMQP.Client (AMQP, Pattern(..), assertQueue, bindQueue, consume, defaultAssertExchangeOptions, defaultAssertQueueOptions, defaultPublishOptions, publish)
+import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions, defaultAssertQueueOptions, defaultPublishOptions)
 import Queue.AMQP.Client as AMQP
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
@@ -25,6 +27,10 @@ config = {
   slow: 75,
   timeout: Just 20000
 }
+
+assert ∷ forall eff. Boolean → Aff eff Unit
+assert a = unless a (throwError (error  "Assertion failed"))
+
 
 -- main :: forall eff. Eff (amqp :: AMQP, exception :: EXCEPTION | eff) Unit
 main :: Eff (RunnerEffects ( amqp :: AMQP )) Unit
@@ -45,10 +51,11 @@ sendToQueueTest =
       _ <- AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
       pure unit
 
-sendToTopicTest :: forall e. Aff ( console :: CONSOLE, amqp :: AMQP | e) Unit
+sendToTopicTest :: forall e. Aff ( console :: CONSOLE, amqp :: AMQP, avar :: AVAR | e) Unit
 sendToTopicTest =
   AMQP.withConnection "amqp://localhost" AMQP.defaultConnectOptions \conn ->
     AMQP.withChannel conn \chan -> do
+      counter <- makeVar' 0 
 
       let exchange = AMQP.Exchange "exchangeOne"
           exchangeType = AMQP.ExchangeType "topic"
@@ -56,7 +63,6 @@ sendToTopicTest =
 
       let routingKey = AMQP.RouteKey "key"
           message = ByteString.fromString "foobar" UTF8
---      publishResp <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 
       let queue = AMQP.Queue "plop"
 
@@ -67,17 +73,23 @@ sendToTopicTest =
 
       _ <- AMQP.bindQueue chan queue exchange pattern args
 
-      _ <- AMQP.consume chan queue func Nothing    
+      _ <- AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 
-      _ <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
+      _ <- AMQP.consume chan queue (func chan counter) Nothing
+
+      _ <- AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 
       delay (Milliseconds 1000.0) -- wait a bit
-
+      value <- peekVar counter
+      assert (value == 2)
       pure unit
     where
-      func :: forall eCb . Maybe ByteString -> Eff eCb Unit
-      func = \msg -> do
-        traceAnyA msg
+      func :: forall eCb . Channel -> AVar Int -> Maybe AMQP.Message -> Eff (amqp :: AMQP, avar :: AVAR | eCb) Unit
+      func chan counter (Just msg) = do
+        _ <- runAff (const $ pure unit) (const $ pure unit) do
+          _ <- AMQP.ack chan msg
+          modifyVar (add 1) counter
         pure unit
+      func chan counter Nothing = pure unit
         
-
+        

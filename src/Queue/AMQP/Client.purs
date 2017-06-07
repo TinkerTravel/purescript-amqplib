@@ -7,6 +7,7 @@ module Queue.AMQP.Client
   , ExchangeType(..)
   , RouteKey(..)
   , Pattern(..)
+  , Message(..)
 
   , ConnectOptions
   , defaultConnectOptions
@@ -33,10 +34,15 @@ module Queue.AMQP.Client
   , defaultPublishOptions
   , publish
 
+  , bindQueueImpl
   , bindQueue
 
   , ConsumeOptions
+  , consumeImpl
   , consume
+
+  , ackImpl
+  , ack
   ) where
 
 -- Doc: http://www.squaremobius.net/amqp.node/channel_api.html
@@ -45,16 +51,19 @@ module Queue.AMQP.Client
 import Prelude
 
 import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff, kind Effect)
-import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Error.Class (class MonadError, catchError, throwError)
 import Data.ByteString (ByteString)
 import Data.Either (Either(..), either)
 import Data.Foreign (Foreign, toForeign)
+import Data.Function.Uncurried (Fn2, Fn4, Fn5, runFn2, runFn4, runFn5)
 import Data.Generic (class Generic, gShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds)
+import Data.Unit (unit)
 
 
 --------------------------------------------------------------------------------
@@ -89,6 +98,32 @@ newtype ExchangeType = ExchangeType String
 derive newtype instance eqExchangeType :: Eq ExchangeType
 derive newtype instance ordExchangeType :: Ord ExchangeType
 derive instance newtypeExchangeType :: Newtype ExchangeType _
+
+
+type Message =
+  { fields :: Foreign
+   {- consumerTag: 'amq.ctag-V5Byeogawjg91OQhMklbwQ',
+     deliveryTag: 11,
+     redelivered: false,
+     exchange: 'exchangeOne',
+     routingKey: 'key' -}
+  , properties :: Foreign
+{-   { contentType: undefined,
+     contentEncoding: undefined,
+     headers: {},
+     deliveryMode: undefined,
+     priority: undefined,
+     correlationId: undefined,
+     replyTo: undefined,
+     expiration: undefined,
+     messageId: undefined,
+     timestamp: undefined,
+     type: undefined,
+     userId: undefined,
+     appId: undefined,
+     clusterId: undefined -}
+  , content :: ByteString
+}
 
 
 --------------------------------------------------------------------------------
@@ -200,13 +235,22 @@ type AssertExchangeResponse = {
 
 data AssertExchangeResponseData = AssertExchangeResponse AssertExchangeResponse
 
-foreign import assertExchange
+foreign import assertExchangeImpl
+  :: forall eff
+   . Fn4 Channel
+    Exchange
+    ExchangeType
+    AssertExchangeOptions
+    (Aff (amqp :: AMQP | eff) AssertExchangeResponse)
+
+assertExchange
   :: forall eff
    . Channel
   -> Exchange
   -> ExchangeType
   -> AssertExchangeOptions
   -> Aff (amqp :: AMQP | eff) AssertExchangeResponse
+assertExchange = runFn4 assertExchangeImpl
 
 --------------------------------------------------------------------------------
 
@@ -222,14 +266,22 @@ defaultSendToQueueOptions =
 -- | It is recommended you always derive options from
 -- | `defaultSendToQueueOptions` using record updates. This way more options
 -- | can be added later without breaking your code.
-foreign import sendToQueue
+foreign import sendToQueueImpl
+  :: forall eff
+   . Fn4 Channel
+    Queue
+    ByteString
+    SendToQueueOptions
+    (Aff (amqp :: AMQP | eff) Boolean)
+
+sendToQueue
   :: forall eff
    . Channel
   -> Queue
   -> ByteString
   -> SendToQueueOptions
   -> Aff (amqp :: AMQP | eff) Boolean
-
+sendToQueue = runFn4 sendToQueueImpl
 
 --------------------------------------------------------------------------------
 
@@ -293,7 +345,16 @@ defaultPublishOptions = {
   , appId : Nothing
 }
 
-foreign import publish
+foreign import publishImpl
+  :: forall eff
+   . Fn5 Channel
+    Exchange
+    RouteKey
+    ByteString
+    PublishOptions
+    (Aff (amqp :: AMQP | eff) Boolean)
+
+publish
   :: forall eff
    . Channel
   -> Exchange
@@ -301,6 +362,7 @@ foreign import publish
   -> ByteString
   -> PublishOptions
   -> Aff (amqp :: AMQP | eff) Boolean
+publish = runFn5 publishImpl
 
 --------------------------------------------------------------------------------
 
@@ -313,14 +375,23 @@ args is an object containing extra arguments that may be required for the partic
 The server reply has no fields.
 -}
 
-foreign import bindQueue
+foreign import bindQueueImpl
   :: forall eff
+   . Fn5 Channel
+  Queue
+  Exchange
+  Pattern
+  Foreign -- args
+  (Aff (amqp :: AMQP | eff) Unit)
+
+bindQueue :: forall eff
    . Channel
   -> Queue
   -> Exchange
   -> Pattern
   -> Foreign -- args
   -> Aff (amqp :: AMQP | eff) Unit
+bindQueue = runFn5 bindQueueImpl
 
 --------------------------------------------------------------------------------
 
@@ -348,16 +419,41 @@ defaultConsumeOptions =
   , arguments : Nothing
 }
 
-foreign import consume
+foreign import consumeImpl
   :: forall eff
-   . Channel
-  -> Queue
-  -> (forall e . Maybe ByteString -> Eff e Unit)
-  -> Maybe ConsumeOptions
-  -> Aff (amqp :: AMQP | eff) Unit
+    . Fn4
+    Channel
+    Queue
+    (forall e . Maybe Message -> Eff (amqp :: AMQP, avar :: AVAR | e) Unit)  
+    (Maybe ConsumeOptions)
+    (Aff (amqp :: AMQP | eff) Unit)
+
+consume :: forall eff
+    . Channel
+    -> Queue
+    -> (forall e . Maybe Message -> Eff (amqp :: AMQP, avar :: AVAR | e) Unit)  
+    -> Maybe ConsumeOptions
+    -> Aff (amqp :: AMQP | eff) Unit
+
+consume = runFn4 consumeImpl
 
 --------------------------------------------------------------------------------
 
+foreign import ackImpl
+  :: forall eff
+   . Fn2
+    Channel
+    Message
+    (Aff (amqp :: AMQP | eff) Unit)
+
+ack :: forall eff
+    . Channel
+    -> Message
+    -> Aff (amqp :: AMQP | eff) Unit
+ack = runFn2 ackImpl 
+
+
+--------------------------------------------------------------------------------
 
 bracket
   :: forall error monad resource result
