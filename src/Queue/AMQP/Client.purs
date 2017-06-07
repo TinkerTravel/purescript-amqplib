@@ -32,7 +32,6 @@ import Data.Time.Duration (Milliseconds)
 
 
 --------------------------------------------------------------------------------
--- RANDOM
 foreign import data AMQP :: Effect
 
 foreign import data Connection :: Type
