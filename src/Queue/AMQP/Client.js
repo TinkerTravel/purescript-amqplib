@@ -112,3 +112,28 @@ exports.sendToQueue = function (chan) {
     };
   };
 };
+
+exports.publish = function (chan) {
+  return function (exchange) {
+    return function (routeKey) {
+      return function (content) {
+        return function (psOptions) {
+          var options = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
+          var jsOptions = {};
+          var len = options.length;
+          for (var i = 0; i < len; i++) {
+            var o = options[i];
+            var po = psOptions[o];
+            if (po && po instanceof Data_Maybe.Just) {
+              jsOptions[o] = po.value0;
+            }
+          }
+          return function (onSuccess, onError) {
+            var sent = chan.publish(exchange, routeKey, content, jsOptions);
+            onSuccess(sent);
+          };
+        };
+      };
+    };
+  };
+};

@@ -5,6 +5,7 @@ module Queue.AMQP.Client
   , Queue(..)
   , Exchange(..)
   , ExchangeType(..)
+  , RouteKey(..)
 
   , ConnectOptions
   , defaultConnectOptions
@@ -26,6 +27,10 @@ module Queue.AMQP.Client
   , SendToQueueOptions
   , defaultSendToQueueOptions
   , sendToQueue
+
+  , PublishOptions
+  , defaultPublishOptions
+  , publish
   ) where
 
 import Prelude
@@ -57,8 +62,12 @@ derive instance newtypeQueue :: Newtype Queue _
 newtype Exchange = Exchange String
 derive newtype instance eqExchange :: Eq Exchange
 derive newtype instance ordExchange :: Ord Exchange
-instance showExchange :: Show Exchange where show (Exchange s) = show s
 derive instance newtypeExchange :: Newtype Exchange _
+
+newtype RouteKey = RouteKey String
+derive newtype instance eqRouteKey :: Eq RouteKey
+derive newtype instance ordRouteKey :: Ord RouteKey
+derive instance newtypeRouteKey :: Newtype RouteKey _
 
 newtype ExchangeType = ExchangeType String
 derive newtype instance eqExchangeType :: Eq ExchangeType
@@ -175,9 +184,6 @@ type AssertExchangeResponse = {
 
 data AssertExchangeResponseData = AssertExchangeResponse AssertExchangeResponse
 
-instance showAssertExchangeResponse :: Show AssertExchangeResponseData where
-  show (AssertExchangeResponse x) = "exchange: " <> (show x.exchange)
-
 foreign import assertExchange
   :: forall eff
    . Channel
@@ -206,6 +212,81 @@ foreign import sendToQueue
   -> Queue
   -> ByteString
   -> SendToQueueOptions
+  -> Aff (amqp :: AMQP | eff) Boolean
+
+
+--------------------------------------------------------------------------------
+
+type PublishOptions = {
+    -- Used by RabbitMQ and sent on to consumers:
+
+    expiration :: Maybe String -- if supplied, the message will be discarded from a queue once it's been there longer than the given number of milliseconds. In the specification this is a string; numbers supplied here will be coerced to strings for transit.
+
+  , userId :: Maybe String  -- If supplied, RabbitMQ will compare it to the username supplied when opening the connection, and reject messages for which it does not match.
+
+  , "CC" :: Maybe (Array String) -- an array of routing keys as strings; messages will be routed to these routing keys in addition to that given as the routingKey parameter. This will override any value given for CC in the headers parameter. NB The property names CC and BCC are case-sensitive.
+
+  , priority :: Maybe Int -- (positive integer): a priority for the message; ignored by versions of RabbitMQ older than 3.5.0, or if the queue is not a priority queue (see maxPriority above).
+
+  , persistent :: Maybe Boolean -- If truthy, the message will survive broker restarts provided it's in a queue that also survives restarts. Corresponds to, and overrides, the property deliveryMode.
+
+  -- Used by RabbitMQ but not sent on to consumers:
+
+  , mandatory :: Maybe Boolean -- if true, the message will be returned if it is not routed to a queue (i.e., if there are no bindings that match its routing key).
+
+  , "BCC" :: Maybe (Array String) -- like CC, except that the value will not be sent in the message headers to consumers.
+
+  -- Ignored by RabbitMQ (but may be useful for applications):
+
+  , contentType :: Maybe String -- a MIME type for the message content
+
+  , contentEncoding :: Maybe String --  a MIME encoding for the message content
+
+  , headers :: Maybe Foreign -- (object): application specific headers to be carried along with the message content. The value as sent may be augmented by extension-specific fields if they are given in the parameters, for example, 'CC', since these are encoded as message headers; the supplied value won't be mutated
+
+  , correlationId :: Maybe String -- usually used to match replies to requests, or similar
+
+  , replyTo :: Maybe String -- often used to name a queue to which the receiving application must send replies, in an RPC scenario (many libraries assume this pattern)
+
+  , messageId :: Maybe String -- arbitrary application-specific identifier for the message
+
+  , timestamp :: Maybe Number -- a timestamp for the message
+
+  , type :: Maybe String -- an arbitrary application-specific type for the message
+
+  , appId :: Maybe String -- an arbitrary identifier for the originating application
+}
+
+defaultPublishOptions :: PublishOptions
+defaultPublishOptions = {
+    expiration : Nothing
+  , userId : Nothing
+  , "CC" : Nothing
+  , priority : Nothing
+  , persistent : Nothing
+  , mandatory : Nothing
+  , "BCC" : Nothing
+  , contentType :Nothing
+  , contentEncoding :Nothing
+  , headers :Nothing
+  , correlationId :Nothing
+  , replyTo :Nothing
+  , messageId :Nothing
+  , timestamp :Nothing
+  , "type" :Nothing
+  , appId : Nothing
+}
+
+-- | It is recommended you always derive options from
+-- | `defaultSendToQueueOptions` using record updates. This way more options
+-- | can be added later without breaking your code.
+foreign import publish
+  :: forall eff
+   . Channel
+  -> Exchange
+  -> RouteKey
+  -> ByteString
+  -> PublishOptions
   -> Aff (amqp :: AMQP | eff) Boolean
 
 --------------------------------------------------------------------------------

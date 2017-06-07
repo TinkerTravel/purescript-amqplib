@@ -8,8 +8,9 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Data.ByteString as ByteString
 import Data.Maybe (Maybe(..))
+import Debug.Trace (traceAnyA)
 import Node.Encoding (Encoding(UTF8))
-import Queue.AMQP.Client (AMQP, defaultAssertExchangeOptions)
+import Queue.AMQP.Client (AMQP, defaultAssertExchangeOptions, defaultPublishOptions, publish)
 import Queue.AMQP.Client as AMQP
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
@@ -35,7 +36,7 @@ sendToQueueTest =
   AMQP.withConnection "amqp://localhost" AMQP.defaultConnectOptions \conn ->
     AMQP.withChannel conn \chan -> do
       let queue = AMQP.Queue "qu'est-ce que c'est"
-      let message = ByteString.fromString "foobar" UTF8
+          message = ByteString.fromString "foobar" UTF8
       _ <- AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
       _ <- AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
       pure unit
@@ -45,7 +46,12 @@ sendToTopicTest =
   AMQP.withConnection "amqp://localhost" AMQP.defaultConnectOptions \conn ->
     AMQP.withChannel conn \chan -> do
       let exchange = AMQP.Exchange "exchangeOne"
-      let exchangeType = AMQP.ExchangeType "topic"
-      resp <- AMQP.assertExchange chan exchange exchangeType (defaultAssertExchangeOptions)
+          exchangeType = AMQP.ExchangeType "topic"
+      exchangeResp <- AMQP.assertExchange chan exchange exchangeType (defaultAssertExchangeOptions)
+
+      let routingKey = AMQP.RouteKey "key"
+          message = ByteString.fromString "foobar" UTF8
+      publishResp <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
+      
       pure unit
 
