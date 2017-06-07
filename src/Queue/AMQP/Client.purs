@@ -6,6 +6,7 @@ module Queue.AMQP.Client
   , Exchange(..)
   , ExchangeType(..)
   , RouteKey(..)
+  , Pattern(..)
 
   , ConnectOptions
   , defaultConnectOptions
@@ -31,12 +32,15 @@ module Queue.AMQP.Client
   , PublishOptions
   , defaultPublishOptions
   , publish
+
+  , bindQueue
   ) where
 
 import Prelude
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (kind Effect)
+import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Error.Class (class MonadError, catchError, throwError)
 import Data.ByteString (ByteString)
 import Data.Either (Either(..), either)
@@ -63,6 +67,12 @@ newtype Exchange = Exchange String
 derive newtype instance eqExchange :: Eq Exchange
 derive newtype instance ordExchange :: Ord Exchange
 derive instance newtypeExchange :: Newtype Exchange _
+
+newtype Pattern = Pattern String
+derive newtype instance eqPattern :: Eq Pattern
+derive newtype instance ordPattern :: Ord Pattern
+derive instance newtypePattern :: Newtype Pattern _
+
 
 newtype RouteKey = RouteKey String
 derive newtype instance eqRouteKey :: Eq RouteKey
@@ -277,9 +287,6 @@ defaultPublishOptions = {
   , appId : Nothing
 }
 
--- | It is recommended you always derive options from
--- | `defaultSendToQueueOptions` using record updates. This way more options
--- | can be added later without breaking your code.
 foreign import publish
   :: forall eff
    . Channel
@@ -290,6 +297,27 @@ foreign import publish
   -> Aff (amqp :: AMQP | eff) Boolean
 
 --------------------------------------------------------------------------------
+
+
+{-
+Assert a routing path from an exchange to a queue: the exchange named by source will relay messages to the queue named, according to the type of the exchange and the pattern given. The RabbitMQ tutorials give a good account of how routing works in AMQP.
+
+args is an object containing extra arguments that may be required for the particular exchange type (for which, see your server's documentation). It may be omitted if it's the last argument, which is equivalent to an empty object.
+
+The server reply has no fields.
+-}
+
+foreign import bindQueue
+  :: forall eff
+   . Channel
+  -> Queue
+  -> Exchange
+  -> Pattern
+  -> Foreign -- args
+  -> Aff (amqp :: AMQP | eff) Unit
+
+--------------------------------------------------------------------------------
+
 
 bracket
   :: forall error monad resource result

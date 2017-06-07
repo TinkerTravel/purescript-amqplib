@@ -137,3 +137,23 @@ exports.publish = function (chan) {
     };
   };
 };
+
+exports.bindQueue = function (chan) {
+  return function (queue) {
+    return function (exchange) {
+      return function (pattern) {
+        return function (args) {
+          return function (onSuccess, onError) {
+            chan.bindQueue(queue, exchange, pattern, args, function (err, ok) {
+              if (err) {
+                onError(err)
+              } else {
+                onSuccess(ok);
+              }
+            });
+          };
+        };
+      };
+    };
+  };
+};
