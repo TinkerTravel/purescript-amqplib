@@ -12,7 +12,7 @@ import Prelude
 import Queue.AMQP.Client (AMQP)
 import Queue.AMQP.Client as AMQP
 
-main :: forall eff. Eff (amqp :: AMQP, err :: EXCEPTION | eff) Unit
+main :: forall eff. Eff (amqp :: AMQP, exception :: EXCEPTION | eff) Unit
 main = void $ launchAff main'
 
 main' :: forall eff. Aff (amqp :: AMQP | eff) Unit
@@ -21,6 +21,6 @@ main' =
     AMQP.withChannel conn \chan -> do
       let queue = AMQP.Queue "qu'est-ce que c'est"
       let message = ByteString.fromString "foobar" UTF8
-      AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
-      AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
+      _ <- AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
+      _ <- AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
       pure unit

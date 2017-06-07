@@ -20,17 +20,18 @@ module Queue.AMQP.Client
   , sendToQueue
   ) where
 
+import Prelude
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (kind Effect)
 import Control.Monad.Error.Class (class MonadError, catchError, throwError)
 import Data.ByteString (ByteString)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds)
-import Prelude
+
 
 --------------------------------------------------------------------------------
-
 foreign import data AMQP :: Effect
 
 foreign import data Connection :: Type
