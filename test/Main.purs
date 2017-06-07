@@ -4,15 +4,17 @@ module Test.Main
 
 import Prelude
 
-import Control.Monad.Aff (Aff, attempt)
+import Control.Monad.Aff (Aff, attempt, delay)
 import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
+import Data.ByteString (ByteString)
 import Data.ByteString as ByteString
 import Data.Foreign (toForeign)
 import Data.Maybe (Maybe(..))
-import Debug.Trace (traceAnyA)
+import Data.Time.Duration (Milliseconds(..))
+import Debug.Trace (traceA, traceAnyA)
 import Node.Encoding (Encoding(UTF8))
-import Queue.AMQP.Client (AMQP, Pattern(..), assertQueue, bindQueue, defaultAssertExchangeOptions, defaultAssertQueueOptions, defaultPublishOptions, publish)
+import Queue.AMQP.Client (AMQP, Pattern(..), assertQueue, bindQueue, consume, defaultAssertExchangeOptions, defaultAssertQueueOptions, defaultPublishOptions, publish)
 import Queue.AMQP.Client as AMQP
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
@@ -54,16 +56,28 @@ sendToTopicTest =
 
       let routingKey = AMQP.RouteKey "key"
           message = ByteString.fromString "foobar" UTF8
-      publishResp <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
+--      publishResp <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 
       let queue = AMQP.Queue "plop"
 
       _ <- AMQP.assertQueue chan (Just queue) defaultAssertQueueOptions
 
-      let pattern = AMQP.Pattern "hop"
+      let pattern = AMQP.Pattern "key"
           args = toForeign {}
 
       _ <- AMQP.bindQueue chan queue exchange pattern args
-      
+
+      _ <- AMQP.consume chan queue func Nothing    
+
+      _ <-  AMQP.publish chan exchange routingKey message (defaultPublishOptions)
+
+      delay (Milliseconds 1000.0) -- wait a bit
+
       pure unit
+    where
+      func :: forall eCb . Maybe ByteString -> Eff eCb Unit
+      func = \msg -> do
+        traceAnyA msg
+        pure unit
+        
 

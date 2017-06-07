@@ -3,6 +3,24 @@
 var amqplib = require('amqplib/callback_api');
 var Data_Maybe = require('../Data.Maybe');
 
+var extractVars = function (options, keys) {
+  var res = {};
+  var len = keys.length;
+  for (var i = 0; i < len; i++) {
+    var o = keys[i];
+    var po = options[o];
+    if (po) {
+      if (po instanceof Data_Maybe.Just) {
+        res[o] = po.value0;
+      } else if (po instanceof Data_Maybe.Nothing) {
+      } else {
+        res[o] = po;
+      }
+    }
+  }
+  return res;
+}
+
 exports.connect = function (url) {
   return function (psOptions) {
     var jsOptions = {};
@@ -118,16 +136,9 @@ exports.publish = function (chan) {
     return function (routeKey) {
       return function (content) {
         return function (psOptions) {
-          var options = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
-          var jsOptions = {};
-          var len = options.length;
-          for (var i = 0; i < len; i++) {
-            var o = options[i];
-            var po = psOptions[o];
-            if (po && po instanceof Data_Maybe.Just) {
-              jsOptions[o] = po.value0;
-            }
-          }
+          var keys = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
+          var jsOptions = extractVars(psOptions, keys);
+
           return function (onSuccess, onError) {
             var sent = chan.publish(exchange, routeKey, content, jsOptions);
             onSuccess(sent);
@@ -157,3 +168,35 @@ exports.bindQueue = function (chan) {
     };
   };
 };
+
+exports.consume = function (chan) {
+  return function (queue) {
+    return function (cb) {
+      return function (psOptions) {
+        var jsOptions = {};
+
+        if (psOptions instanceof Data_Maybe.Just) {
+          var keys = ["consumerTag", "noLocal", "noAck", "exclusive", "priority", "arguments"];
+          jsOptions = extractVars(psOptions.value0, keys);
+        }
+
+        return function (onSuccess, onError) {
+          chan.consume(queue, function (msg) {
+            console.log("RECEIVED MSG ", msg);
+            if (msg) {
+              cb(new Data_Maybe.Just(msg));
+            } else {
+              cb(new Data_Maybe.Nothing());
+            }
+          }, jsOptions, function (err, ok) {
+            if (err) {
+              onError(err);
+            } else {
+              onSuccess(ok);
+            }
+          })
+        }
+      }
+    }
+  }
+}

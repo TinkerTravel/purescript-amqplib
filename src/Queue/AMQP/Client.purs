@@ -34,12 +34,18 @@ module Queue.AMQP.Client
   , publish
 
   , bindQueue
+
+  , ConsumeOptions
+  , consume
   ) where
+
+-- Doc: http://www.squaremobius.net/amqp.node/channel_api.html
+
 
 import Prelude
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff (kind Effect)
+import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Error.Class (class MonadError, catchError, throwError)
 import Data.ByteString (ByteString)
@@ -314,6 +320,40 @@ foreign import bindQueue
   -> Exchange
   -> Pattern
   -> Foreign -- args
+  -> Aff (amqp :: AMQP | eff) Unit
+
+--------------------------------------------------------------------------------
+
+type ConsumeOptions = 
+  { consumerTag :: Maybe String --  a name which the server will use to distinguish message deliveries for the consumer; mustn't be already in use on the channel. It's usually easier to omit this, in which case the server will create a random name and supply it in the reply.
+
+  , noLocal :: Maybe Boolean -- in theory, if true then the broker won't deliver messages to the consumer if they were also published on this connection; RabbitMQ doesn't implement it though, and will ignore it. Defaults to false.
+
+  , noAck :: Maybe Boolean -- if true, the broker won't expect an acknowledgement of messages delivered to this consumer; i.e., it will dequeue messages as soon as they've been sent down the wire. Defaults to false (i.e., you will be expected to acknowledge messages).
+
+  , exclusive :: Maybe Boolean -- if true, the broker won't let anyone else consume from this queue; if there already is a consumer, there goes your channel (so usually only useful if you've made a 'private' queue by letting the server choose its name).
+
+  , priority :: Maybe Int -- gives a priority to the consumer; higher priority consumers get messages in preference to lower priority consumers. See this RabbitMQ extension's documentation
+
+  , arguments :: Maybe Foreign -- arbitrary arguments. Go to town.  
+}
+
+defaultConsumeOptions :: ConsumeOptions
+defaultConsumeOptions = 
+  { consumerTag : Nothing
+  , noLocal : Nothing
+  , noAck : Nothing
+  , exclusive : Nothing
+  , priority : Nothing
+  , arguments : Nothing
+}
+
+foreign import consume
+  :: forall eff
+   . Channel
+  -> Queue
+  -> (forall e . Maybe ByteString -> Eff e Unit)
+  -> Maybe ConsumeOptions
   -> Aff (amqp :: AMQP | eff) Unit
 
 --------------------------------------------------------------------------------
