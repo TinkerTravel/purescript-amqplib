@@ -13,11 +13,15 @@ import Control.Monad.Error.Class (throwError)
 import Data.ByteString as ByteString
 import Data.Foreign (toForeign)
 import Data.Maybe (Maybe(..))
+import Data.Monoid ((<>))
+import Data.Options (Options(..), (:=))
 import Data.Time.Duration (Milliseconds(..))
 import Debug.Trace (traceAnyA)
 import Node.Encoding (Encoding(UTF8))
-import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions, defaultAssertQueueOptions, defaultPublishOptions)
+import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions, defaultAssertQueueOptions)
 import Queue.AMQP.Client as AMQP
+import Queue.AMQP.ConsumeOptions (priority)
+import Queue.AMQP.PublishOptions (appId, defaultPublishOptions)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (RunnerEffects, Config, run')
@@ -73,9 +77,9 @@ sendToTopicTest =
 
       _ <- AMQP.bindQueue chan queue exchange pattern args
 
-      _ <- AMQP.publish chan exchange routingKey message (defaultPublishOptions)
+      _ <- AMQP.publish chan exchange routingKey message defaultPublishOptions
 
-      _ <- AMQP.consume chan queue (func chan counter) Nothing
+      _ <- AMQP.consume chan queue (func chan counter) Nothing -- Nothing
 
       _ <- AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 

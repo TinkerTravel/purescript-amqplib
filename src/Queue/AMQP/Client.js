@@ -3,24 +3,6 @@
 var amqplib = require('amqplib/callback_api');
 var Data_Maybe = require('../Data.Maybe');
 
-var extractVars = function (options, keys) {
-  var res = {};
-  var len = keys.length;
-  for (var i = 0; i < len; i++) {
-    var o = keys[i];
-    var po = options[o];
-    if (po) {
-      if (po instanceof Data_Maybe.Just) {
-        res[o] = po.value0;
-      } else if (po instanceof Data_Maybe.Nothing) {
-      } else {
-        res[o] = po;
-      }
-    }
-  }
-  return res;
-}
-
 exports._connect = function (url) {
   return function (psOptions) {
     var jsOptions = {};
@@ -147,20 +129,17 @@ exports._sendToQueue = function (chan, queue, content, psOptions) {
   };
 };
 
-var publishOptionsKeys = ["expiration", "userId", "CC", "priority", "persistent", "mandatory", "BCC", "contentType", "contentEncoding", "headers", "correlationId", "replyTo", "messageId", "timestamp", "type", "appId"];
-
-exports._publish = function (chan, exchange, routeKey, content, psOptions) {
-  var jsOptions = extractVars(psOptions, publishOptionsKeys);
-
+exports._publish = function (chan, exchange, routeKey, content, options) {
   return function (onError) {
     return function (onSuccess) {
       return function () {
-        var sent = chan.publish(exchange, routeKey, content, jsOptions);
+        var sent = chan.publish(exchange, routeKey, content, options);
         onSuccess(sent)();
       };
     };
   };
 };
+
 
 exports._bindQueue = function (chan, queue, exchange, pattern, args) {
   return function (onError) {
@@ -178,13 +157,11 @@ exports._bindQueue = function (chan, queue, exchange, pattern, args) {
   };
 };
 
-var consumeOptionsKeys = ["consumerTag", "noLocal", "noAck", "exclusive", "priority", "arguments"];
-
-exports._consume = function (chan, queue, cb, psOptions) {
+exports._consume = function (chan, queue, cb, options) {
   var jsOptions = {};
 
-  if (psOptions instanceof Data_Maybe.Just) {
-    jsOptions = extractVars(psOptions.value0, consumeOptionsKeys);
+  if (options instanceof Data_Maybe.Just) {
+    jsOptions = options.value0;
   }
 
   return function (onError) {
