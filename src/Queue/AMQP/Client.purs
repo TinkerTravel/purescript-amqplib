@@ -2,13 +2,6 @@ module Queue.AMQP.Client
   ( AMQP
   , Connection
   , Channel
-  , Queue(..)
-  , Exchange(..)
-  , ExchangeType(..)
-  , RouteKey(..)
-  , Pattern(..)
-  , Message(..)
-
 
   , ConnectOptions
   , defaultConnectOptions
@@ -19,9 +12,6 @@ module Queue.AMQP.Client
   , AssertQueueResponse
   , assertQueue
 
-  , AssertExchangeOptions
-  , AssertExchangeOptionsArguments
-  , defaultAssertExchangeOptions
   , AssertExchangeResponse
   , assertExchange
 
@@ -58,10 +48,12 @@ import Data.Newtype (class Newtype)
 import Data.Options (Option, Options(..), opt, options, (:=))
 import Data.Time.Duration (Milliseconds)
 import Data.Unit (unit)
+import Queue.AMQP.AssertExchangeOptions (AssertExchangeOptions)
 import Queue.AMQP.AssertQueueOptions (AssertQueueOptions)
 import Queue.AMQP.ConsumeOptions (ConsumeOptions)
 import Queue.AMQP.PublishOptions (PublishOptions)
 import Queue.AMQP.SendToQueueOptions (SendToQueueOptions)
+import Queue.AMQP.Types
 
 
 
@@ -75,57 +67,6 @@ foreign import data Channel :: Type
 type AMQPEffects e a = Eff (amqp :: AMQP | e) a
 
 type AMQPAction e a = (Error -> AMQPEffects e Unit) -> (a -> AMQPEffects e Unit) -> AMQPEffects e Unit
-
-newtype Queue = Queue String
-derive newtype instance eqQueue :: Eq Queue
-derive newtype instance ordQueue :: Ord Queue
-derive instance newtypeQueue :: Newtype Queue _
-
-newtype Exchange = Exchange String
-derive newtype instance eqExchange :: Eq Exchange
-derive newtype instance ordExchange :: Ord Exchange
-derive instance newtypeExchange :: Newtype Exchange _
-
-newtype Pattern = Pattern String
-derive newtype instance eqPattern :: Eq Pattern
-derive newtype instance ordPattern :: Ord Pattern
-derive instance newtypePattern :: Newtype Pattern _
-
-newtype RouteKey = RouteKey String
-derive newtype instance eqRouteKey :: Eq RouteKey
-derive newtype instance ordRouteKey :: Ord RouteKey
-derive instance newtypeRouteKey :: Newtype RouteKey _
-
-newtype ExchangeType = ExchangeType String
-derive newtype instance eqExchangeType :: Eq ExchangeType
-derive newtype instance ordExchangeType :: Ord ExchangeType
-derive instance newtypeExchangeType :: Newtype ExchangeType _
-
-
-type Message =
-  { fields :: Foreign
-   {- consumerTag: 'amq.ctag-V5Byeogawjg91OQhMklbwQ',
-     deliveryTag: 11,
-     redelivered: false,
-     exchange: 'exchangeOne',
-     routingKey: 'key' -}
-  , properties :: Foreign
-{-   { contentType: undefined,
-     contentEncoding: undefined,
-     headers: {},
-     deliveryMode: undefined,
-     priority: undefined,
-     correlationId: undefined,
-     replyTo: undefined,
-     expiration: undefined,
-     messageId: undefined,
-     timestamp: undefined,
-     type: undefined,
-     userId: undefined,
-     appId: undefined,
-     clusterId: undefined -}
-  , content :: ByteString
-}
 
 
 --------------------------------------------------------------------------------
@@ -247,25 +188,6 @@ assertQueue chan queue opts = makeAff (_assertQueue chan queue (options opts))
 
 --------------------------------------------------------------------------------
 
-type AssertExchangeOptionsArguments = {}
-
-type AssertExchangeOptions =
-  { durable :: Boolean -- if true, the exchange will survive broker restarts. Defaults to true.
-  , internal:: Boolean -- if true, messages cannot be published directly to the exchange (i.e., it can only be the target of bindings, or possibly create messages ex-nihilo). Defaults to false.
-  ,  autoDelete:: Boolean -- if true, the exchange will be destroyed once the number of bindings for which it is the source drop to zero. Defaults to false.
-  ,  alternateExchange:: Exchange -- an exchange to send messages to if this exchange can't route them to any queues.
-  ,  arguments:: Foreign
-  }
-
-defaultAssertExchangeOptions :: AssertExchangeOptions
-defaultAssertExchangeOptions =
-  { durable : true
-  , internal: false
-  , autoDelete: false
-  , alternateExchange: Exchange ""
-  , arguments: toForeign {}
-  }
-
 type AssertExchangeResponse = {
   exchange :: Exchange
 }
@@ -277,7 +199,7 @@ foreign import _assertExchange
    . Fn4 Channel
     Exchange
     ExchangeType
-    AssertExchangeOptions
+    Foreign
     (AMQPAction eff AssertExchangeResponse)
 
 assertExchange
@@ -285,9 +207,9 @@ assertExchange
    . Channel
     -> Exchange
     -> ExchangeType
-    -> AssertExchangeOptions
+    -> Options AssertExchangeOptions
     -> (Aff (amqp :: AMQP | eff) AssertExchangeResponse)
-assertExchange c e et o = makeAff $ (runFn4 _assertExchange) c e et o
+assertExchange c e et o = makeAff $ (runFn4 _assertExchange) c e et (options o)
 
 --------------------------------------------------------------------------------
 
