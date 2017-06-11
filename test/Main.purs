@@ -22,6 +22,7 @@ import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions, defaultAs
 import Queue.AMQP.Client as AMQP
 import Queue.AMQP.ConsumeOptions (priority)
 import Queue.AMQP.PublishOptions (appId, defaultPublishOptions)
+import Queue.AMQP.SendToQueueOptions (defaultSendToQueueOptions)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (RunnerEffects, Config, run')
@@ -52,7 +53,7 @@ sendToQueueTest =
       let queue = AMQP.Queue "qu'est-ce que c'est"
           message = ByteString.fromString "foobar" UTF8
       _ <- AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
-      _ <- AMQP.sendToQueue chan queue message AMQP.defaultSendToQueueOptions
+      _ <- AMQP.sendToQueue chan queue message defaultSendToQueueOptions
       pure unit
 
 sendToTopicTest :: forall e. Aff ( console :: CONSOLE, amqp :: AMQP, avar :: AVAR | e) Unit

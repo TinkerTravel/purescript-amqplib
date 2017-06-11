@@ -114,15 +114,11 @@ exports._assertExchange = function (chan, exchange, exchangeType, psOptions) {
   };
 };
 
-exports._sendToQueue = function (chan, queue, content, psOptions) {
-  var jsOptions = {};
-  if (psOptions.expiration instanceof Data_Maybe.Just) {
-    jsOptions.expiration = psOptions.expiration.value0;
-  }
+exports._sendToQueue = function (chan, queue, content, options) {
   return function (onError) {
     return function (onSuccess) {
       return function () {
-        var sent = chan.sendToQueue(queue, content, jsOptions);
+        var sent = chan.sendToQueue(queue, content, options);
         onSuccess(sent)();
       };
     };

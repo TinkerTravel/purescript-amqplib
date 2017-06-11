@@ -4,10 +4,8 @@ import Data.Foreign (Foreign)
 import Data.Monoid (mempty)
 import Data.Options (Option, Options, opt)
 
-
   -- Used by RabbitMQ and sent on to consumers:
 foreign import data ConsumeOptions :: Type
-
 
 consumerTag :: Option ConsumeOptions String
 consumerTag = opt "consumerTag" --  a name which the server will use to distinguish message deliveries for the consumer; mustn't be already in use on the channel. It's usually easier to omit this, in which case the server will create a random name and supply it in the reply.

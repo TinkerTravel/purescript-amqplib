@@ -27,8 +27,6 @@ module Queue.AMQP.Client
   , AssertExchangeResponse
   , assertExchange
 
-  , SendToQueueOptions
-  , defaultSendToQueueOptions
   , sendToQueue
 
   , publish
@@ -64,6 +62,7 @@ import Data.Time.Duration (Milliseconds)
 import Data.Unit (unit)
 import Queue.AMQP.ConsumeOptions (ConsumeOptions)
 import Queue.AMQP.PublishOptions (PublishOptions)
+import Queue.AMQP.SendToQueueOptions (SendToQueueOptions)
 
 
 
@@ -304,15 +303,6 @@ assertExchange c e et o = makeAff $ (runFn4 _assertExchange) c e et o
 
 --------------------------------------------------------------------------------
 
-type SendToQueueOptions =
-  { expiration :: Maybe Milliseconds
-  }
-
-defaultSendToQueueOptions :: SendToQueueOptions
-defaultSendToQueueOptions =
-  { expiration: Nothing
-  }
-
 -- | It is recommended you always derive options from
 -- | `defaultSendToQueueOptions` using record updates. This way more options
 -- | can be added later without breaking your code.
@@ -321,7 +311,7 @@ foreign import _sendToQueue
    . Fn4 Channel
     Queue
     ByteString
-    SendToQueueOptions
+    Foreign
     (AMQPAction eff Boolean)
 
 sendToQueue
@@ -329,9 +319,9 @@ sendToQueue
    . Channel
   -> Queue
   -> ByteString
-  -> SendToQueueOptions
+  -> (Options SendToQueueOptions)
   -> Aff (amqp :: AMQP | eff) Boolean
-sendToQueue c q b o = makeAff $ (runFn4 _sendToQueue) c q b o
+sendToQueue c q b o = makeAff $ (runFn4 _sendToQueue) c q b (options o)
 
 --------------------------------------------------------------------------------
 
