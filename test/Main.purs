@@ -2,8 +2,8 @@ module Test.Main
   ( main
   ) where
 
-import Prelude
-import Queue.AMQP.Types
+import Prelude (Unit, add, bind, const, discard, pure, unit, unless, ($), (<>), (==))
+import Queue.AMQP.Types (Exchange(..), ExchangeType(..), Message, Pattern(..), Queue(..), RouteKey(..))
 
 import Control.Monad.Aff (Aff, delay, runAff)
 import Control.Monad.Aff.AVar (AVAR, AVar, makeVar', modifyVar, peekVar)
@@ -80,7 +80,7 @@ sendToTopicTest =
 
       _ <- AMQP.publish chan exchange routingKey message defaultPublishOptions
 
-      _ <- AMQP.consume chan queue (func chan counter) Nothing -- Nothing
+      _ <- AMQP.consume chan queue (func chan counter) Nothing
 
       _ <- AMQP.publish chan exchange routingKey message (defaultPublishOptions)
 

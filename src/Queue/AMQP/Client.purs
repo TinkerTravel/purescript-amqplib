@@ -33,29 +33,21 @@ import Prelude
 
 import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Error.Class (class MonadError, catchError, throwError)
 import Data.ByteString (ByteString)
 import Data.Either (Either(..), either)
-import Data.Foreign (Foreign, toForeign)
+import Data.Foreign (Foreign)
 import Data.Function.Uncurried (Fn2, Fn4, Fn5, runFn2, runFn4, runFn5)
-import Data.Generic (class Generic, gShow)
-import Data.Maybe (Maybe(..))
-import Data.Monoid (mempty)
-import Data.Newtype (class Newtype)
-import Data.Options (Option, Options(..), opt, options, (:=))
-import Data.Time.Duration (Milliseconds)
-import Data.Unit (unit)
+import Data.Maybe (Maybe)
+import Data.Options (Options, options)
 import Queue.AMQP.AssertExchangeOptions (AssertExchangeOptions)
 import Queue.AMQP.AssertQueueOptions (AssertQueueOptions)
 import Queue.AMQP.ConsumeOptions (ConsumeOptions)
 import Queue.AMQP.PublishOptions (PublishOptions)
 import Queue.AMQP.SendToQueueOptions (SendToQueueOptions)
-import Queue.AMQP.Types
-
-
+import Queue.AMQP.Types (Exchange, ExchangeType, Message, Pattern, Queue, RouteKey)
 
 --------------------------------------------------------------------------------
 foreign import data AMQP :: Effect
@@ -78,9 +70,6 @@ defaultConnectOptions :: ConnectOptions
 defaultConnectOptions =
   {}
 
--- | It is recommended you always derive options from `defaultConnectOptions`
--- | using record updates. This way more options can be added later without
--- | breaking your code.
 withConnection
   :: forall eff a
    . String
@@ -154,21 +143,6 @@ type AssertQueueResponse =
   , consumerCount :: Int
   }
 
--- | It is recommended you always derive options from
--- | `defaultAssertQueueOptions` using record updates. This way more options
--- | can be added later without breaking your code.
-{-
-foreign import assertQueue
-  :: forall eff
-   . Channel
-  -> Maybe Queue
-  -> AssertQueueOptions
-  -> Aff (amqp :: AMQP | eff) AssertQueueResponse
--}
-
---  -> AMQPAction e AssertQueueResponse
-
-
 foreign import _assertQueue
   :: forall e
    . Channel
@@ -213,9 +187,6 @@ assertExchange c e et o = makeAff $ (runFn4 _assertExchange) c e et (options o)
 
 --------------------------------------------------------------------------------
 
--- | It is recommended you always derive options from
--- | `defaultSendToQueueOptions` using record updates. This way more options
--- | can be added later without breaking your code.
 foreign import _sendToQueue
   :: forall eff
    . Fn4 Channel
@@ -256,7 +227,6 @@ publish c e k b o = makeAff $ (runFn5 _publish) c e k b (options o)
 
 
 --------------------------------------------------------------------------------
-
 
 {-
 Assert a routing path from an exchange to a queue: the exchange named by source will relay messages to the queue named, according to the type of the exchange and the pattern given. The RabbitMQ tutorials give a good account of how routing works in AMQP.
