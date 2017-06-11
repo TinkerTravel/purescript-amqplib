@@ -76,14 +76,11 @@ exports._assertQueue = function (chan) {
     if (psQueue instanceof Data_Maybe.Just) {
       jsQueue = psQueue.value0;
     }
-    return function (psOptions) {
-      var jsOptions = {};
-      jsOptions.exclusive = psOptions.exclusive;
-      jsOptions.durable = psOptions.durable;
+    return function (options) {
       return function (onError) {
         return function (onSuccess) {
           return function () {
-            chan.assertQueue(jsQueue, jsOptions, function (err, ok) {
+            chan.assertQueue(jsQueue, options, function (err, ok) {
               if (err != null) {
                 onError(err)();
               } else {

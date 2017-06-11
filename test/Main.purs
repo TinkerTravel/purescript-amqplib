@@ -14,15 +14,18 @@ import Data.ByteString as ByteString
 import Data.Foreign (toForeign)
 import Data.Maybe (Maybe(..))
 import Data.Monoid ((<>))
-import Data.Options (Options(..), (:=))
+import Data.Newtype (wrap)
+import Data.Options (Option, Options(..), opt, (:=))
+import Data.Semigroup ((<>))
 import Data.Time.Duration (Milliseconds(..))
 import Debug.Trace (traceAnyA)
 import Node.Encoding (Encoding(UTF8))
-import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions, defaultAssertQueueOptions)
+import Queue.AMQP.AssertQueueOptions (defaultAssertQueueOptions, exclusive)
+import Queue.AMQP.Client (AMQP, Channel, defaultAssertExchangeOptions)
 import Queue.AMQP.Client as AMQP
 import Queue.AMQP.ConsumeOptions (priority)
 import Queue.AMQP.PublishOptions (appId, defaultPublishOptions)
-import Queue.AMQP.SendToQueueOptions (defaultSendToQueueOptions)
+import Queue.AMQP.SendToQueueOptions (SendToQueueOptions, defaultSendToQueueOptions, expiration)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (RunnerEffects, Config, run')
@@ -52,7 +55,7 @@ sendToQueueTest =
     AMQP.withChannel conn \chan -> do
       let queue = AMQP.Queue "qu'est-ce que c'est"
           message = ByteString.fromString "foobar" UTF8
-      _ <- AMQP.assertQueue chan (Just queue) AMQP.defaultAssertQueueOptions { exclusive = true }
+      _ <- AMQP.assertQueue chan (Just queue) (defaultAssertQueueOptions <> exclusive := true)
       _ <- AMQP.sendToQueue chan queue message defaultSendToQueueOptions
       pure unit
 

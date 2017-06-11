@@ -16,8 +16,6 @@ module Queue.AMQP.Client
 
   , withChannel
 
-  , AssertQueueOptions
-  , defaultAssertQueueOptions
   , AssertQueueResponse
   , assertQueue
 
@@ -60,6 +58,7 @@ import Data.Newtype (class Newtype)
 import Data.Options (Option, Options(..), opt, options, (:=))
 import Data.Time.Duration (Milliseconds)
 import Data.Unit (unit)
+import Queue.AMQP.AssertQueueOptions (AssertQueueOptions)
 import Queue.AMQP.ConsumeOptions (ConsumeOptions)
 import Queue.AMQP.PublishOptions (PublishOptions)
 import Queue.AMQP.SendToQueueOptions (SendToQueueOptions)
@@ -208,17 +207,6 @@ closeChannel = makeAff <<< _closeChannel
 
 --------------------------------------------------------------------------------
 
-type AssertQueueOptions =
-  { exclusive :: Boolean
-  , durable   :: Boolean
-  }
-
-defaultAssertQueueOptions :: AssertQueueOptions
-defaultAssertQueueOptions =
-  { exclusive: false
-  , durable:   true
-  }
-
 type AssertQueueResponse =
   { queue         :: Queue
   , messageCount  :: Int
@@ -244,18 +232,18 @@ foreign import _assertQueue
   :: forall e
    . Channel
   -> Maybe Queue
-  -> AssertQueueOptions
+  -> Foreign
   -> AMQPAction e AssertQueueResponse
 
 assertQueue :: forall eff
    . Channel
   -> Maybe Queue
-  -> AssertQueueOptions
+  -> (Options AssertQueueOptions)
   -> Aff (amqp :: AMQP | eff) AssertQueueResponse
 
 -- assertQueue chan queue opts = makeAff (_assertQueue chan queue opts)
 
-assertQueue chan queue opts = makeAff (_assertQueue chan queue opts)
+assertQueue chan queue opts = makeAff (_assertQueue chan queue (options opts))
 
 --------------------------------------------------------------------------------
 
